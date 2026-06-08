@@ -13,8 +13,6 @@ const schema = z.object({
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  STRIPE_PRICE_PRO: z.string().optional(),
-  STRIPE_PRICE_TEAM: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
 });
 
@@ -28,8 +26,6 @@ export const env = schema.parse({
   OPENAI_MODEL: process.env.OPENAI_MODEL,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-  STRIPE_PRICE_PRO: process.env.STRIPE_PRICE_PRO,
-  STRIPE_PRICE_TEAM: process.env.STRIPE_PRICE_TEAM,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
 });
 

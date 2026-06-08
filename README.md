@@ -46,9 +46,19 @@ pnpm dev
 1. **Database** — any PostgreSQL URL (Neon/Supabase/local).
 2. **GitHub OAuth app** — set `GITHUB_ID` / `GITHUB_SECRET`.
 3. **OpenAI** — set `OPENAI_API_KEY`.
-4. **Stripe** — create two recurring Prices, set `STRIPE_PRICE_PRO` / `STRIPE_PRICE_TEAM`, and point a webhook at `/api/stripe/webhook` with `STRIPE_WEBHOOK_SECRET`.
+4. **Stripe** — set `STRIPE_SECRET_KEY` (prefer a restricted key, `rk_...`) and point a webhook at `/api/stripe/webhook` with `STRIPE_WEBHOOK_SECRET`. You never paste price IDs — see below.
 
 All variables are documented in [`.env.example`](.env.example).
+
+### Stripe products & prices (code as source of truth)
+
+Plans are defined in code in [`lib/pricing.ts`](lib/pricing.ts) — name, amount, and a stable `lookupKey`. To provision them in Stripe, run:
+
+```bash
+pnpm stripe:sync
+```
+
+This idempotently creates/updates the Products and Prices in whatever account `STRIPE_SECRET_KEY` belongs to (so run it with **your** key), tagging each price with its `lookupKey`. At runtime the app resolves the live price ID by `lookupKey` via [`lib/stripe-prices.ts`](lib/stripe-prices.ts) — no price IDs in env or code. Changing a price is just editing `lib/pricing.ts` and re-running the sync.
 
 ## Monetization
 
@@ -59,6 +69,7 @@ Recurring subscriptions. Pick an ultra-narrow niche (e.g. "summarize leases for 
 - `pnpm dev` / `pnpm build` / `pnpm start`
 - `pnpm lint` / `pnpm typecheck`
 - `pnpm db:push` — push the Prisma schema
+- `pnpm stripe:sync` — provision Stripe products/prices from `lib/pricing.ts`
 
 ## License
 

@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { requireEnv } from "@/lib/env";
-import { PLANS } from "@/lib/pricing";
+import { planIdForLookupKey } from "@/lib/pricing";
 
 // Stripe requires the raw request body to verify the signature.
 export async function POST(request: Request) {
@@ -26,11 +26,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature." }, { status: 400 });
   }
 
-  // Map a Stripe price ID back to our internal plan id.
-  function planForPrice(priceId: string | undefined): string {
-    if (priceId && priceId === PLANS.team.stripePriceId) return "team";
-    if (priceId && priceId === PLANS.pro.stripePriceId) return "pro";
-    return "free";
+  // Resolve our internal plan from a subscription: prefer the plan we stamped
+  // onto the subscription metadata at checkout, then fall back to the price's
+  // stable lookup_key.
+  function planForSubscription(subscription: Stripe.Subscription): string {
+    const metaPlan = subscription.metadata?.plan;
+    if (metaPlan === "pro" || metaPlan === "team" || metaPlan === "free") {
+      return metaPlan;
+    }
+    const lookupKey = subscription.items.data[0]?.price.lookup_key ?? undefined;
+    return planIdForLookupKey(lookupKey);
   }
 
   try {
@@ -42,12 +47,11 @@ export async function POST(request: Request) {
         if (userId && subscriptionId) {
           const subscription =
             await stripe.subscriptions.retrieve(subscriptionId);
-          const priceId = subscription.items.data[0]?.price.id;
           await prisma.user.update({
             where: { id: userId },
             data: {
               stripeSubscriptionId: subscription.id,
-              plan: planForPrice(priceId),
+              plan: planForSubscription(subscription),
               currentPeriodEnd: new Date(
                 subscription.current_period_end * 1000,
               ),
@@ -58,13 +62,12 @@ export async function POST(request: Request) {
       }
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        const priceId = subscription.items.data[0]?.price.id;
         await prisma.user.updateMany({
           where: { stripeSubscriptionId: subscription.id },
           data: {
             plan:
               subscription.status === "active"
-                ? planForPrice(priceId)
+                ? planForSubscription(subscription)
                 : "free",
             currentPeriodEnd: new Date(subscription.current_period_end * 1000),
           },
